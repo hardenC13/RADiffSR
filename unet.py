@@ -63,11 +63,10 @@ class Mish(nn.Module):
         return x * torch.tanh(F.softplus(x))
 
 
-class Upsample(nn.Module):
+class U_Invertedblock(nn.Module):
     def __init__(self, dim):
         super().__init__()
         self.up = nn.Upsample(scale_factor=2, mode="nearest")
-        #self.up = nn.Upsample(scale_factor=2, mode="bicubic")
         self.conv = nn.Conv2d(dim, dim, 3, padding=1)
         self.invertedblock = invertedBlock(dim, dim)
     def forward(self, x):
@@ -75,7 +74,7 @@ class Upsample(nn.Module):
         return self.conv(self.up(x))
 
 
-class Downsample(nn.Module):
+class D_Invertedblock(nn.Module):
     def __init__(self, dim):
         super().__init__()
         self.conv = nn.Conv2d(dim, dim, 3, 2, 1)
@@ -246,7 +245,7 @@ class UNet(nn.Module):
                 feat_channels.append(channel_mult)
                 pre_channel = channel_mult
             if not is_last:
-                downs.append(Downsample(pre_channel))
+                downs.append(D_Invertedblock(pre_channel))
                 feat_channels.append(pre_channel)
                 now_res = now_res//2
         self.downs = nn.ModuleList(downs)
@@ -272,7 +271,7 @@ class UNet(nn.Module):
                         dropout=dropout, with_attn=use_attn))
                 pre_channel = channel_mult
             if not is_last:
-                ups.append(Upsample(pre_channel))
+                ups.append(U_Invertedblock(pre_channel))
                 now_res = now_res*2
 
         self.ups = nn.ModuleList(ups)
@@ -524,4 +523,5 @@ if __name__ == "__main__":
     dec = torch.randn(1, 128, 32, 32) # dec_channels=128
     csdg = CrossScaleDynamicGating(256, 128)
     output = csdg(enc, dec)
+
     assert output.shape == dec.shape, f"Output shape {output.shape} != Decoder shape {dec.shape}"
